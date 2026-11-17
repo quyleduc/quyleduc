@@ -1,0 +1,37 @@
+name: Refresh GitHub profile
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '37 1 * * *'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'assets/portrait.txt'
+      - 'tests/**'
+      - '.github/workflows/update-profile.yml'
+permissions:
+  contents: write
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run offline tests
+        run: python -m unittest discover -s tests -v
+      - name: Pull public GitHub stats and render SVGs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/generate.py --strict
+      - name: Commit generated art only when changed
+        shell: bash
+        run: |
+          git add assets/neofetch-dark.svg assets/neofetch-light.svg assets/heatmap-dark.svg assets/heatmap-light.svg
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'chore: refresh profile statistics [skip ci]'
+            git push
+          fi
